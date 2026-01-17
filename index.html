@@ -189,8 +189,18 @@ body.theme-low button.is-stop {
   background-color: #d06a6a;
   border-color: #9a3f3f;
 }
+body.theme-low button {
+  background-color: #3a3a3a;
+  color: #eeeeee;
+}
 
-  
+/* ← この下に追加 */
+footer.copyright {
+  margin-top: 32px;
+  text-align: center;
+  font-size: 12px;
+  color: #777;
+}
 </style>
 </head>
 
@@ -686,6 +696,10 @@ renderCurrent();
 startBtn.classList.remove("is-active");
 stopBtn.classList.add("is-stop");
 </script>
+
+<footer class="copyright">
+  © 2026 Ten-CraftWorks. All rights reserved.
+</footer>
 
 </body>
 </html>
