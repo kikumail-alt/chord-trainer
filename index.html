@@ -436,6 +436,16 @@ function drawFretboard(frets, titleText) {
     svg += `<line x1="${padL}" y1="${y}" x2="${padL+gridW}" y2="${y}" stroke="${lineColor}" stroke-width="${sw}"/>`;
   }
 
+    // フレット番号（6弦の下に表示）
+  const yBottom = yForString(0) + 22; // 6弦(=sIndex0=0)の少し下
+  for (let rel = 0; rel < fretCount; rel++) {
+    const x1 = xForFretLine(rel);
+    const x2 = xForFretLine(rel + 1);
+    const cx = (x1 + x2) / 2;
+    const num = base + rel;
+    svg += `<text x="${cx}" y="${yBottom}" font-size="12" text-anchor="middle" fill="${textColor}">${num}</text>`;
+  }
+
   // フレット縦線
   for (let f=0; f<fretLines; f++){
     const x = xForFretLine(f);
