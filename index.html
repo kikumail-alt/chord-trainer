@@ -6,9 +6,10 @@
   <title>Chord Trainer</title>
   <style>
     body { font-family: system-ui, sans-serif; padding: 24px; }
+    h1 { margin: 0 0 14px; }
     .chord { font-size: 72px; font-weight: 800; margin: 16px 0 10px; }
     .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-    button { padding: 10px 14px; font-size: 16px; }
+    button { padding: 10px 14px; font-size: 16px; cursor: pointer; }
     input[type="range"] { width: 220px; }
 
     .panel { margin-top: 18px; padding: 14px; border: 1px solid #ddd; border-radius: 12px; }
@@ -17,6 +18,10 @@
     .checks label { display: flex; gap: 8px; align-items: center; user-select: none; }
     .hint { font-size: 13px; color: #555; margin-top: 10px; }
     .warn { color: #b00020; font-size: 14px; margin-top: 8px; display:none; }
+
+    .groupHeader { display: flex; align-items: center; gap: 10px; margin: 14px 0 6px; }
+    .groupHeader h3 { margin: 0; min-width: 24px; }
+    .smallBtn { padding: 6px 10px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -37,26 +42,38 @@
   </div>
 
   <div class="panel">
-    <h2>表示するコードを選ぶ</h2>
+    <h2>表示するコードを選ぶ（ルートごと一括ON/OFF）</h2>
 
     <div class="row" style="margin-bottom:10px;">
       <button id="selectAll" type="button">全選択</button>
       <button id="clearAll" type="button">全解除</button>
     </div>
 
-    <div class="checks" id="checks"></div>
+    <div id="checks"></div>
     <div class="warn" id="warn">⚠️ 1つ以上コードを選んでください</div>
-    <div class="hint">※チェックしたコードだけが出題されます</div>
+    <div class="hint">※チェックしたコードだけが出題されます（選択は保存されます）</div>
   </div>
 
   <script>
-    // ここに「候補として表示したいコード」を並べておけばOK（チェックで絞り込み）
-    const ALL_CHORDS = ["C","Cm","D","Dm","E","Em","F","Fm","G","Gm","A","Am","B","Bm","C7","D7","E7","F7","G7","A7"];
+    // ===== ルート別コード定義（ここを好みに増やしてOK） =====
+    const CHORD_GROUPS = {
+      "C": ["C", "Cm", "C7"],
+      "D": ["D", "Dm", "D7"],
+      "E": ["E", "Em", "E7"],
+      "F": ["F", "Fm", "F7"],
+      "G": ["G", "Gm", "G7"],
+      "A": ["A", "Am", "A7"],
+      "B": ["B", "Bm"]
+    };
 
+    const ALL_CHORDS = Object.values(CHORD_GROUPS).flat();
+
+    // ===== 状態 =====
     let index = 0;
     let timerId = null;
     let intervalSec = 3;
 
+    // ===== DOM =====
     const chordEl = document.getElementById("chord");
     const secEl = document.getElementById("sec");
     const secLabel = document.getElementById("secLabel");
@@ -70,8 +87,9 @@
     const selectAllBtn = document.getElementById("selectAll");
     const clearAllBtn = document.getElementById("clearAll");
 
-    // --- 選択状態（localStorageに保存） ---
+    // ===== 選択状態（localStorage） =====
     const STORAGE_KEY = "chord_trainer_selected";
+
     function loadSelectedSet() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -83,6 +101,7 @@
         return new Set(ALL_CHORDS);
       }
     }
+
     let selected = loadSelectedSet();
 
     function saveSelectedSet() {
@@ -97,7 +116,8 @@
       warnEl.style.display = show ? "block" : "none";
     }
 
-    function showChord(chords) {
+    function showChord() {
+      const chords = getActiveChords();
       if (chords.length === 0) {
         chordEl.textContent = "—";
         showWarn(true);
@@ -111,7 +131,7 @@
       const chords = getActiveChords();
       if (chords.length === 0) {
         stop();
-        showChord(chords);
+        showChord();
         return;
       }
 
@@ -124,13 +144,13 @@
         index = (index + 1) % chords.length;
       }
 
-      showChord(chords);
+      showChord();
     }
 
     function start() {
       const chords = getActiveChords();
       if (chords.length === 0) {
-        showChord(chords);
+        showChord();
         return;
       }
       if (timerId) return;
@@ -147,7 +167,7 @@
       stopBtn.disabled = true;
     }
 
-    // 秒数変更（動作中なら張り替え）
+    // 表示秒数変更（動作中なら張り替え）
     secEl.addEventListener("input", () => {
       intervalSec = Number(secEl.value);
       secLabel.textContent = intervalSec;
@@ -158,61 +178,98 @@
     stopBtn.addEventListener("click", stop);
     nextBtn.addEventListener("click", nextChord);
 
-    // --- チェックボックスUI生成 ---
-function renderChecks() {
-  checksWrap.innerHTML = "";
-
-  for (const root in CHORD_GROUPS) {
-    // グループ見出し
-    const title = document.createElement("h3");
-    title.textContent = root;
-    title.style.margin = "12px 0 6px";
-    checksWrap.appendChild(title);
-
-    // グループ内コード
-    const groupDiv = document.createElement("div");
-    groupDiv.className = "checks";
-
-    for (const c of CHORD_GROUPS[root]) {
-      const label = document.createElement("label");
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.checked = selected.has(c);
-
-      input.addEventListener("change", () => {
-        if (input.checked) selected.add(c);
-        else selected.delete(c);
-        saveSelectedSet();
-        index = 0;
-        showChord(getActiveChords());
-        if (timerId && getActiveChords().length === 0) stop();
-      });
-
-      const span = document.createElement("span");
-      span.textContent = c;
-
-      label.appendChild(input);
-      label.appendChild(span);
-      groupDiv.appendChild(label);
-    }
-
-    checksWrap.appendChild(groupDiv);
-  }
-
-  showChord(getActiveChords());
-}
-
-    selectAllBtn.addEventListener("click", () => {
-      selected = new Set(ALL_CHORDS);
+    // ===== チェックボックス描画（ルート別 + 一括ON/OFF） =====
+    function applySelectionChange() {
       saveSelectedSet();
       index = 0;
+      showChord();
+      if (timerId && getActiveChords().length === 0) stop();
+    }
+
+    function renderChecks() {
+      checksWrap.innerHTML = "";
+
+      for (const root in CHORD_GROUPS) {
+        const chordsInGroup = CHORD_GROUPS[root];
+
+        // 見出し + 一括ON/OFF
+        const header = document.createElement("div");
+        header.className = "groupHeader";
+
+        const title = document.createElement("h3");
+        title.textContent = root;
+
+        const onBtn = document.createElement("button");
+        onBtn.type = "button";
+        onBtn.className = "smallBtn";
+        onBtn.textContent = `${root} 全ON`;
+
+        const offBtn = document.createElement("button");
+        offBtn.type = "button";
+        offBtn.className = "smallBtn";
+        offBtn.textContent = `${root} 全OFF`;
+
+        header.appendChild(title);
+        header.appendChild(onBtn);
+        header.appendChild(offBtn);
+        checksWrap.appendChild(header);
+
+        // グループ内チェック
+        const groupDiv = document.createElement("div");
+        groupDiv.className = "checks";
+
+        const inputs = [];
+
+        onBtn.addEventListener("click", () => {
+          for (const c of chordsInGroup) selected.add(c);
+          for (const inp of inputs) inp.checked = true;
+          applySelectionChange();
+        });
+
+        offBtn.addEventListener("click", () => {
+          for (const c of chordsInGroup) selected.delete(c);
+          for (const inp of inputs) inp.checked = false;
+          applySelectionChange();
+        });
+
+        for (const c of chordsInGroup) {
+          const label = document.createElement("label");
+          const input = document.createElement("input");
+          input.type = "checkbox";
+          input.checked = selected.has(c);
+
+          input.addEventListener("change", () => {
+            if (input.checked) selected.add(c);
+            else selected.delete(c);
+            applySelectionChange();
+          });
+
+          inputs.push(input);
+
+          const span = document.createElement("span");
+          span.textContent = c;
+
+          label.appendChild(input);
+          label.appendChild(span);
+          groupDiv.appendChild(label);
+        }
+
+        checksWrap.appendChild(groupDiv);
+      }
+
+      showChord();
+    }
+
+    // 全選択 / 全解除
+    selectAllBtn.addEventListener("click", () => {
+      selected = new Set(ALL_CHORDS);
+      applySelectionChange();
       renderChecks();
     });
 
     clearAllBtn.addEventListener("click", () => {
       selected = new Set();
-      saveSelectedSet();
-      index = 0;
+      applySelectionChange();
       renderChecks();
       stop();
     });
