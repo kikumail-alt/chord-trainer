@@ -14,13 +14,7 @@ body {
 }
 
 h1 {
-  margin-bottom: 12px;
-}
-
-.chord {
-  font-size: 64px;
-  font-weight: 800;
-  margin: 12px 0;
+  margin: 0 0 12px;
 }
 
 .row {
@@ -33,10 +27,17 @@ h1 {
 button {
   padding: 8px 12px;
   font-size: 14px;
+  cursor: pointer;
 }
 
 input[type="range"] {
   width: 200px;
+}
+
+.chord {
+  font-size: 56px;
+  font-weight: 800;
+  margin: 12px 0 8px;
 }
 
 .panel {
@@ -46,22 +47,34 @@ input[type="range"] {
   border-radius: 12px;
 }
 
+.panel h2 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 900px) {
+  .grid2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .checks {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 6px 10px;
 }
 
-.groupHeader {
+.checks label {
   display: flex;
-  align-items: center;
   gap: 8px;
-  margin-top: 14px;
-}
-
-.smallBtn {
-  font-size: 12px;
-  padding: 4px 8px;
+  align-items: center;
+  user-select: none;
 }
 
 .warn {
@@ -79,10 +92,11 @@ input[type="range"] {
 .sub {
   font-size: 13px;
   color: #555;
+  margin-top: 6px;
 }
 
 .mono {
-  font-family: monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 /* ===== テーマ切替 ===== */
@@ -104,18 +118,24 @@ body.theme-dark {
 body.theme-dark .panel,
 body.theme-dark .fbCard {
   background-color: #1a1a1a;
+  border-color: #444;
 }
 
 body.theme-dark button {
   background-color: #222222;
   color: #eeeeee;
+  border: 1px solid #555;
+}
+
+body.theme-dark .sub {
+  color: #cfcfcf;
 }
 
 body.theme-dark svg {
   filter: invert(1) hue-rotate(180deg);
 }
 
-/* ===== 低コントラスト（改善版） ===== */
+/* ===== 低コントラスト（目に優しい） ===== */
 body.theme-low {
   background-color: #2a2a2a;
   color: #dddddd;
@@ -123,13 +143,18 @@ body.theme-low {
 
 body.theme-low .panel,
 body.theme-low .fbCard {
-  background-color: #333333;
-  border-color: #555555;
+  background-color: #3a3a3a;
+  border-color: #666;
 }
 
 body.theme-low button {
-  background-color: #3a3a3a;
-  color: #eeeeee;
+  background-color: #444;
+  color: #f0f0f0;
+  border: 1px solid #666;
+}
+
+body.theme-low .sub {
+  color: #d7d7d7;
 }
 </style>
 </head>
@@ -147,64 +172,157 @@ body.theme-low button {
 <div class="row">
   <label>表示秒数 <span id="secLabel">3</span> 秒</label>
   <input id="sec" type="range" min="1" max="10" value="3">
+  <label><input type="checkbox" id="random" checked> ランダム</label>
 </div>
 
 <div class="chord" id="chord">C</div>
 
 <div class="fbCard" id="fretboard"></div>
 <div class="sub mono" id="shapeText"></div>
+<div class="sub">表示は「上＝1弦（細いE） / 下＝6弦（太いE）」です。</div>
 
-<div class="row">
+<div class="row" style="margin-top:10px;">
   <button id="start">Start</button>
   <button id="stop" disabled>Stop</button>
   <button id="next">Next</button>
-  <label><input type="checkbox" id="random" checked> ランダム</label>
 </div>
 
 <div class="panel">
-  <div class="row">
-    <button id="selectAll">全選択</button>
-    <button id="clearAll">全解除</button>
+  <h2>教科書PDFの表どおり：ルート（C〜B）× 種類（Major / 7 / M7 / m / m7 / dim / dim7 / sus4）</h2>
+
+  <div class="grid2">
+    <div>
+      <div class="row" style="margin-bottom:8px;">
+        <strong>ルート（キー）</strong>
+        <button id="rootsAll" type="button">全選択</button>
+        <button id="rootsNone" type="button">全解除</button>
+      </div>
+      <div class="checks" id="rootChecks"></div>
+    </div>
+
+    <div>
+      <div class="row" style="margin-bottom:8px;">
+        <strong>種類</strong>
+        <button id="qualAll" type="button">全選択</button>
+        <button id="qualNone" type="button">全解除</button>
+      </div>
+      <div class="checks" id="qualChecks"></div>
+    </div>
   </div>
-  <div id="checks"></div>
-  <div class="warn" id="warn">⚠️ コードを選択してください</div>
+
+  <div class="warn" id="warn">⚠️ ルートと種類を1つ以上選んでください</div>
 </div>
 
 <script>
-/* ===== コード定義（7th追加） ===== */
-const CHORDS = {
-  C:{f:[-1,3,2,0,1,0]},
-  C7:{f:[-1,3,2,3,1,0]},
-  D:{f:[-1,-1,0,2,3,2]},
-  D7:{f:[-1,-1,0,2,1,2]},
-  E:{f:[0,2,2,1,0,0]},
-  E7:{f:[0,2,0,1,0,0]},
-  F:{f:[1,3,3,2,1,1]},
-  F7:{f:[1,3,1,2,1,1]},
-  G:{f:[3,2,0,0,0,3]},
-  G7:{f:[3,2,0,0,0,1]},
-  A:{f:[-1,0,2,2,2,0]},
-  A7:{f:[-1,0,2,0,2,0]},
-  B7:{f:[-1,2,1,2,0,2]}
+/* ===== ルート（# / ♭表記は教科書表に合わせた見た目） ===== */
+const ROOTS = [
+  {label:"C",      idx:0},
+  {label:"C#/Db",  idx:1},
+  {label:"D",      idx:2},
+  {label:"D#/Eb",  idx:3},
+  {label:"E",      idx:4},
+  {label:"F",      idx:5},
+  {label:"F#/Gb",  idx:6},
+  {label:"G",      idx:7},
+  {label:"G#/Ab",  idx:8},
+  {label:"A",      idx:9},
+  {label:"A#/Bb",  idx:10},
+  {label:"B",      idx:11},
+];
+
+/* ===== 種類（教科書表の行） ===== */
+const QUALS = [
+  {key:"Maj",  label:"Major", suffix:""},
+  {key:"7",    label:"7",     suffix:"7"},
+  {key:"M7",   label:"M7",    suffix:"M7"},
+  {key:"m",    label:"m",     suffix:"m"},
+  {key:"m7",   label:"m7",    suffix:"m7"},
+  {key:"dim",  label:"dim",   suffix:"dim"},
+  {key:"dim7", label:"dim7",  suffix:"dim7"},
+  {key:"sus4", label:"sus4",  suffix:"sus4"},
+];
+
+/* ===== 押さえ方：まずは開放コードの“代表”を優先、無いものは移調式（バレー） =====
+   frets: 6弦→1弦, -1=ミュート, 0=開放, 1+=フレット
+*/
+const OPEN_SHAPES = {
+  "C":    [-1,3,2,0,1,0],
+  "C7":   [-1,3,2,3,1,0],
+  "CM7":  [-1,3,2,0,0,0],
+
+  "D":    [-1,-1,0,2,3,2],
+  "D7":   [-1,-1,0,2,1,2],
+  "DM7":  [-1,-1,0,2,2,2],
+  "Dm":   [-1,-1,0,2,3,1],
+  "Dm7":  [-1,-1,0,2,1,1],
+  "Dsus4":[-1,-1,0,2,3,3],
+
+  "E":    [0,2,2,1,0,0],
+  "E7":   [0,2,0,1,0,0],
+  "EM7":  [0,2,1,1,0,0],
+  "Em":   [0,2,2,0,0,0],
+  "Em7":  [0,2,0,0,0,0],
+  "Esus4":[0,2,2,2,0,0],
+
+  "F":    [1,3,3,2,1,1],
+  "F7":   [1,3,1,2,1,1],
+  "FM7":  [1,3,2,2,1,0],
+  "Fm":   [1,3,3,1,1,1],
+  "Fsus4":[1,3,3,3,1,1],
+
+  "G":    [3,2,0,0,0,3],
+  "G7":   [3,2,0,0,0,1],
+  "GM7":  [3,2,0,0,0,2],
+  "Gm":   [3,5,5,3,3,3],
+  "Gsus4":[3,3,0,0,1,3],
+
+  "A":    [-1,0,2,2,2,0],
+  "A7":   [-1,0,2,0,2,0],
+  "AM7":  [-1,0,2,1,2,0],
+  "Am":   [-1,0,2,2,1,0],
+  "Am7":  [-1,0,2,0,1,0],
+  "Asus4":[-1,0,2,2,3,0],
+
+  "B7":   [-1,2,1,2,0,2],
 };
 
-const GROUPS = {
-  C:["C","C7"],
-  D:["D","D7"],
-  E:["E","E7"],
-  F:["F","F7"],
-  G:["G","G7"],
-  A:["A","A7"],
-  B:["B7"]
-};
+/* ===== 移調式（バレー）テンプレ：E形（6弦ルート） ===== */
+function eShape(rootFret, kindKey) {
+  // rootFret は6弦のルート位置（E=0, F=1, ...）
+  const n = rootFret;
+  if (kindKey === "Maj")  return [n, n+2, n+2, n+1, n,   n  ];
+  if (kindKey === "m")    return [n, n+2, n+2, n,   n,   n  ];
+  if (kindKey === "7")    return [n, n+2, n,   n+1, n,   n  ];
+  if (kindKey === "m7")   return [n, n+2, n,   n,   n,   n  ];
+  if (kindKey === "M7")   return [n, n+2, n+1, n+1, n,   n  ];
+  if (kindKey === "sus4") return [n, n+2, n+2, n+2, n,   n  ];
 
-const ALL = Object.keys(CHORDS);
+  // dim / dim7：練習用の「動く形（簡易）」を採用（上3〜4弦中心）
+  // dim:   6弦root、5弦+1、4弦+2、3弦root（それ以外ミュート）
+  if (kindKey === "dim")  return [n, n+1, n+2, n,  -1, -1];
+  // dim7:  6弦root、5弦+1、4弦+2、3弦+1（それ以外ミュート）
+  if (kindKey === "dim7") return [n, n+1, n+2, n+1,-1, -1];
 
-/* ===== 状態 ===== */
-let selected = new Set(ALL);
+  return null;
+}
+
+/* ===== 6弦のルート位置（E基準） ===== */
+function rootFretOn6th(rootIdx) {
+  // E(4)=0, F(5)=1 ... D#(3)=11
+  // rootIdx: C=0 ... B=11
+  // 6弦開放Eは idx=4
+  let f = rootIdx - 4;
+  while (f < 0) f += 12;
+  return f; // 0..11
+}
+
+/* ===== 選択状態 ===== */
+let selectedRoots = new Set(ROOTS.map(r => r.idx));
+let selectedQuals = new Set(QUALS.map(q => q.key));
+
 let index = 0;
-let timer = null;
-let sec = 3;
+let timerId = null;
+let intervalSec = 3;
 
 /* ===== DOM ===== */
 const chordEl = document.getElementById("chord");
@@ -212,117 +330,303 @@ const fretboardEl = document.getElementById("fretboard");
 const shapeTextEl = document.getElementById("shapeText");
 const warnEl = document.getElementById("warn");
 
-/* ===== 指板描画（低コントラスト対応） ===== */
-function drawFretboard(name){
-  const f = CHORDS[name].f;
-  const isLow = document.body.classList.contains("theme-low");
-  const lineColor = isLow ? "#bbbbbb" : "#000000";
-  const dotColor = isLow ? "#f0f0f0" : "#000000";
+const secEl = document.getElementById("sec");
+const secLabel = document.getElementById("secLabel");
 
-  let svg = `<svg viewBox="0 0 700 160" width="100%">`;
-
-  for(let s=0;s<6;s++){
-    let y=30+(5-s)*22;
-    svg+=`<line x1="80" y1="${y}" x2="660" y2="${y}" stroke="${lineColor}" stroke-width="2"/>`;
-  }
-
-  for(let i=0;i<6;i++){
-    let x=80+i*96;
-    svg+=`<line x1="${x}" y1="30" x2="${x}" y2="140" stroke="${lineColor}" stroke-width="2"/>`;
-  }
-
-  for(let s=0;s<6;s++){
-    if(f[s]>0){
-      let cx=80+(f[s]-0.5)*96;
-      let cy=30+(5-s)*22;
-      svg+=`<circle cx="${cx}" cy="${cy}" r="9" fill="${dotColor}"/>`;
-    }
-  }
-
-  svg+=`</svg>`;
-  fretboardEl.innerHTML = svg;
-  shapeTextEl.textContent = "押さえ方: " + f.map(v=>v<0?"x":v).join(" ");
-}
-
-/* ===== 表示 ===== */
-function show(){
-  const arr=[...selected];
-  if(arr.length===0){
-    warnEl.style.display="block";
-    return;
-  }
-  warnEl.style.display="none";
-  const name=arr[index%arr.length];
-  chordEl.textContent=name;
-  drawFretboard(name);
-}
-
-/* ===== チェックUI ===== */
-function renderChecks(){
-  const wrap=document.getElementById("checks");
-  wrap.innerHTML="";
-  for(const g in GROUPS){
-    const h=document.createElement("div");
-    h.className="groupHeader";
-    h.innerHTML=`<strong>${g}</strong>`;
-    wrap.appendChild(h);
-
-    const c=document.createElement("div");
-    c.className="checks";
-    GROUPS[g].forEach(k=>{
-      const l=document.createElement("label");
-      const i=document.createElement("input");
-      i.type="checkbox";
-      i.checked=selected.has(k);
-      i.onchange=()=>{
-        i.checked ? selected.add(k) : selected.delete(k);
-        show();
-      };
-      l.appendChild(i);
-      l.append(k);
-      c.appendChild(l);
-    });
-    wrap.appendChild(c);
-  }
-}
-
-renderChecks();
-show();
-
-/* ===== タイマー ===== */
-document.getElementById("sec").oninput=e=>{
-  sec=+e.target.value;
-  document.getElementById("secLabel").textContent=sec;
-};
-
-document.getElementById("start").onclick=()=>{
-  if(timer)return;
-  timer=setInterval(()=>{index++;show();},sec*1000);
-};
-
-document.getElementById("stop").onclick=()=>{
-  clearInterval(timer);
-  timer=null;
-};
+const startBtn = document.getElementById("start");
+const stopBtn = document.getElementById("stop");
+const nextBtn = document.getElementById("next");
+const randomEl = document.getElementById("random");
 
 /* ===== テーマ ===== */
-const THEME_KEY="theme";
+const THEME_KEY = "chord_trainer_theme";
 function applyTheme(t){
   document.body.classList.remove("theme-dark","theme-low");
-  if(t==="dark")document.body.classList.add("theme-dark");
-  if(t==="low")document.body.classList.add("theme-low");
-  show();
+  if(t==="dark") document.body.classList.add("theme-dark");
+  if(t==="low")  document.body.classList.add("theme-low");
+  renderCurrent();
+}
+applyTheme(localStorage.getItem(THEME_KEY) || "normal");
+document.querySelectorAll(".theme-switch button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    const t = b.dataset.theme;
+    localStorage.setItem(THEME_KEY, t);
+    applyTheme(t);
+  });
+});
+
+/* ===== ルート×種類 から「出題リスト」生成 ===== */
+function buildQueue() {
+  const roots = ROOTS.filter(r => selectedRoots.has(r.idx));
+  const quals = QUALS.filter(q => selectedQuals.has(q.key));
+
+  const queue = [];
+  for (const r of roots) {
+    for (const q of quals) {
+      queue.push({ root:r, qual:q });
+    }
+  }
+  return queue;
 }
 
-applyTheme(localStorage.getItem(THEME_KEY)||"normal");
+/* ===== 表示名（教科書っぽく） ===== */
+function chordName(item) {
+  return item.root.label + item.qual.suffix;
+}
 
-document.querySelectorAll(".theme-switch button").forEach(b=>{
-  b.onclick=()=>{
-    const t=b.dataset.theme;
-    localStorage.setItem(THEME_KEY,t);
-    applyTheme(t);
-  };
+/* ===== 押さえ方を取得 ===== */
+function getFingering(item) {
+  const name = chordName(item);
+
+  // まず開放コード（代表形）があればそれを優先
+  if (OPEN_SHAPES[name]) return OPEN_SHAPES[name];
+
+  // それ以外は移調式（E形バレー）
+  const fret = rootFretOn6th(item.root.idx);
+  return eShape(fret, item.qual.key);
+}
+
+/* ===== 指板描画（開始フレット対応 / 低コントラスト対応） ===== */
+function computeBaseFret(frets) {
+  const pos = frets.filter(v => v > 0);
+  if (pos.length === 0) return 1;
+  const min = Math.min(...pos);
+  const max = Math.max(...pos);
+  // 1〜5に収まるなら開放基準表示
+  if (max <= 5) return 1;
+  // それ以外は最小フレットを開始に
+  return min;
+}
+
+function drawFretboard(frets, titleText) {
+  const isLow = document.body.classList.contains("theme-low");
+  const lineColor = isLow ? "#d0d0d0" : "#000000";
+  const dotColor  = isLow ? "#f5f5f5" : "#000000";
+  const textColor = isLow ? "#f5f5f5" : "#000000";
+
+  const base = computeBaseFret(frets);
+  const fretCount = 6;
+
+  const W = 760, H = 190;
+  const padL = 64, padR = 18, padT = 34, padB = 22;
+  const gridW = W - padL - padR;
+  const gridH = H - padT - padB;
+
+  const stringCount = 6;
+  const fretLines = fretCount + 1;
+  const stringGap = gridH / (stringCount - 1);
+  const fretGap = gridW / fretCount;
+
+  const xForFretLine = (f) => padL + f * fretGap;
+  // 上＝1弦、下＝6弦（一般的）
+  const yForString = (sIndex0) => padT + (5 - sIndex0) * stringGap; // sIndex0: 0..5 (6弦..1弦)
+
+  const stringNames = ["E","A","D","G","B","E"]; // 6→1
+  const dotR = 10;
+
+  let svg = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="fretboard">`;
+
+  svg += `<text x="10" y="20" font-size="16" font-weight="800" fill="${textColor}">${titleText}</text>`;
+  svg += `<text x="10" y="${padT+14}" font-size="12" fill="${textColor}">${base===1 ? "open" : (base + "fr〜")}</text>`;
+
+  // 弦
+  for (let s=0;s<6;s++){
+    const y = yForString(s);
+    const sw = (s===0)?4:(s===1?3.2:(s===2?2.8:(s===3?2.4:(s===4?2.0:1.6))));
+    svg += `<line x1="${padL}" y1="${y}" x2="${padL+gridW}" y2="${y}" stroke="${lineColor}" stroke-width="${sw}"/>`;
+  }
+
+  // フレット縦線
+  for (let f=0; f<fretLines; f++){
+    const x = xForFretLine(f);
+    const sw = (f===0 && base===1) ? 8 : 2; // ナット太線
+    svg += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT+gridH}" stroke="${lineColor}" stroke-width="${sw}"/>`;
+  }
+
+  // 弦名（左）
+  for (let s=0;s<6;s++){
+    const y = yForString(s) + 5;
+    svg += `<text x="${padL-22}" y="${y}" font-size="12" text-anchor="middle" fill="${textColor}">${stringNames[s]}</text>`;
+  }
+
+  // ミュート/開放表示（左）
+  for (let s=0;s<6;s++){
+    const v = frets[s];
+    const t = (v===-1) ? "x" : (v===0 ? "o" : "");
+    if (!t) continue;
+    const y = yForString(s) + 5;
+    svg += `<text x="${padL-42}" y="${y}" font-size="14" font-weight="800" text-anchor="middle" fill="${textColor}">${t}</text>`;
+  }
+
+  // ドット
+  for (let s=0;s<6;s++){
+    const v = frets[s];
+    if (v <= 0) continue;
+    const rel = v - base; // 0..?
+    if (rel < 0 || rel >= fretCount) continue;
+
+    const x1 = xForFretLine(rel);
+    const x2 = xForFretLine(rel+1);
+    const cx = (x1+x2)/2;
+    const cy = yForString(s);
+
+    svg += `<circle cx="${cx}" cy="${cy}" r="${dotR}" fill="${dotColor}"/>`;
+  }
+
+  svg += `</svg>`;
+  fretboardEl.innerHTML = svg;
+}
+
+/* ===== 現在表示 ===== */
+function renderCurrent() {
+  const queue = buildQueue();
+  if (queue.length === 0) {
+    warnEl.style.display = "block";
+    chordEl.textContent = "—";
+    fretboardEl.innerHTML = "";
+    shapeTextEl.textContent = "";
+    return;
+  }
+  warnEl.style.display = "none";
+
+  index = index % queue.length;
+  const item = queue[index];
+
+  const name = chordName(item);
+  chordEl.textContent = name;
+
+  const frets = getFingering(item);
+  drawFretboard(frets, name);
+
+  shapeTextEl.textContent = "押さえ方(6→1): " + frets.map(v => v<0 ? "x" : String(v)).join(" ");
+}
+
+/* ===== 次へ ===== */
+function stepNext() {
+  const queue = buildQueue();
+  if (queue.length === 0) { renderCurrent(); return; }
+
+  if (randomEl.checked) {
+    let next = Math.floor(Math.random() * queue.length);
+    if (queue.length > 1) {
+      while (next === index) next = Math.floor(Math.random() * queue.length);
+    }
+    index = next;
+  } else {
+    index = (index + 1) % queue.length;
+  }
+  renderCurrent();
+}
+
+/* ===== 秒数 ===== */
+secEl.addEventListener("input", (e)=>{
+  intervalSec = Number(e.target.value);
+  secLabel.textContent = intervalSec;
+  if (timerId) {
+    clearInterval(timerId);
+    timerId = setInterval(stepNext, intervalSec*1000);
+  }
 });
+
+/* ===== Start/Stop/Next（Stopが必ず効く版） ===== */
+startBtn.addEventListener("click", ()=>{
+  if (timerId) return;
+  timerId = setInterval(stepNext, intervalSec*1000);
+  startBtn.disabled = true;
+  stopBtn.disabled = false;
+});
+
+stopBtn.addEventListener("click", ()=>{
+  if (!timerId) return;
+  clearInterval(timerId);
+  timerId = null;
+  startBtn.disabled = false;
+  stopBtn.disabled = true;
+});
+
+nextBtn.addEventListener("click", ()=>{
+  stepNext();
+});
+
+/* ===== チェックUI描画 ===== */
+const rootChecksEl = document.getElementById("rootChecks");
+const qualChecksEl = document.getElementById("qualChecks");
+
+function renderRootChecks() {
+  rootChecksEl.innerHTML = "";
+  for (const r of ROOTS) {
+    const label = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = selectedRoots.has(r.idx);
+    cb.addEventListener("change", ()=>{
+      if (cb.checked) selectedRoots.add(r.idx);
+      else selectedRoots.delete(r.idx);
+      index = 0;
+      renderCurrent();
+      if (timerId && buildQueue().length === 0) stopBtn.click();
+    });
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(r.label));
+    rootChecksEl.appendChild(label);
+  }
+}
+
+function renderQualChecks() {
+  qualChecksEl.innerHTML = "";
+  for (const q of QUALS) {
+    const label = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = selectedQuals.has(q.key);
+    cb.addEventListener("change", ()=>{
+      if (cb.checked) selectedQuals.add(q.key);
+      else selectedQuals.delete(q.key);
+      index = 0;
+      renderCurrent();
+      if (timerId && buildQueue().length === 0) stopBtn.click();
+    });
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(q.label));
+    qualChecksEl.appendChild(label);
+  }
+}
+
+/* ===== 全選択/全解除 ===== */
+document.getElementById("rootsAll").addEventListener("click", ()=>{
+  selectedRoots = new Set(ROOTS.map(r=>r.idx));
+  renderRootChecks();
+  index = 0;
+  renderCurrent();
+});
+
+document.getElementById("rootsNone").addEventListener("click", ()=>{
+  selectedRoots = new Set();
+  renderRootChecks();
+  index = 0;
+  renderCurrent();
+  if (timerId) stopBtn.click();
+});
+
+document.getElementById("qualAll").addEventListener("click", ()=>{
+  selectedQuals = new Set(QUALS.map(q=>q.key));
+  renderQualChecks();
+  index = 0;
+  renderCurrent();
+});
+
+document.getElementById("qualNone").addEventListener("click", ()=>{
+  selectedQuals = new Set();
+  renderQualChecks();
+  index = 0;
+  renderCurrent();
+  if (timerId) stopBtn.click();
+});
+
+/* ===== 初期化 ===== */
+renderRootChecks();
+renderQualChecks();
+renderCurrent();
 </script>
 
 </body>
