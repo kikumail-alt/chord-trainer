@@ -159,37 +159,48 @@
     nextBtn.addEventListener("click", nextChord);
 
     // --- チェックボックスUI生成 ---
-    function renderChecks() {
-      checksWrap.innerHTML = "";
-      for (const c of ALL_CHORDS) {
-        const id = `chk_${c.replace(/[^a-zA-Z0-9]/g, "_")}`;
-        const label = document.createElement("label");
-        const input = document.createElement("input");
-        input.type = "checkbox";
-        input.id = id;
-        input.checked = selected.has(c);
-        input.addEventListener("change", () => {
-          if (input.checked) selected.add(c);
-          else selected.delete(c);
-          saveSelectedSet();
+function renderChecks() {
+  checksWrap.innerHTML = "";
 
-          // 選択が変わったらインデックスを安全に戻す
-          index = 0;
-          showChord(getActiveChords());
+  for (const root in CHORD_GROUPS) {
+    // グループ見出し
+    const title = document.createElement("h3");
+    title.textContent = root;
+    title.style.margin = "12px 0 6px";
+    checksWrap.appendChild(title);
 
-          // 動作中で、選択が0になったら停止
-          if (timerId && getActiveChords().length === 0) stop();
-        });
+    // グループ内コード
+    const groupDiv = document.createElement("div");
+    groupDiv.className = "checks";
 
-        const span = document.createElement("span");
-        span.textContent = c;
+    for (const c of CHORD_GROUPS[root]) {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = selected.has(c);
 
-        label.appendChild(input);
-        label.appendChild(span);
-        checksWrap.appendChild(label);
-      }
-      showChord(getActiveChords());
+      input.addEventListener("change", () => {
+        if (input.checked) selected.add(c);
+        else selected.delete(c);
+        saveSelectedSet();
+        index = 0;
+        showChord(getActiveChords());
+        if (timerId && getActiveChords().length === 0) stop();
+      });
+
+      const span = document.createElement("span");
+      span.textContent = c;
+
+      label.appendChild(input);
+      label.appendChild(span);
+      groupDiv.appendChild(label);
     }
+
+    checksWrap.appendChild(groupDiv);
+  }
+
+  showChord(getActiveChords());
+}
 
     selectAllBtn.addEventListener("click", () => {
       selected = new Set(ALL_CHORDS);
