@@ -6,10 +6,17 @@
   <title>Chord Trainer</title>
   <style>
     body { font-family: system-ui, sans-serif; padding: 24px; }
-    .chord { font-size: 72px; font-weight: 800; margin: 20px 0; }
+    .chord { font-size: 72px; font-weight: 800; margin: 16px 0 10px; }
     .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
     button { padding: 10px 14px; font-size: 16px; }
     input[type="range"] { width: 220px; }
+
+    .panel { margin-top: 18px; padding: 14px; border: 1px solid #ddd; border-radius: 12px; }
+    .panel h2 { font-size: 16px; margin: 0 0 10px; }
+    .checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px 12px; }
+    .checks label { display: flex; gap: 8px; align-items: center; user-select: none; }
+    .hint { font-size: 13px; color: #555; margin-top: 10px; }
+    .warn { color: #b00020; font-size: 14px; margin-top: 8px; display:none; }
   </style>
 </head>
 <body>
@@ -29,8 +36,23 @@
     <label><input type="checkbox" id="random" checked> ランダム</label>
   </div>
 
+  <div class="panel">
+    <h2>表示するコードを選ぶ</h2>
+
+    <div class="row" style="margin-bottom:10px;">
+      <button id="selectAll" type="button">全選択</button>
+      <button id="clearAll" type="button">全解除</button>
+    </div>
+
+    <div class="checks" id="checks"></div>
+    <div class="warn" id="warn">⚠️ 1つ以上コードを選んでください</div>
+    <div class="hint">※チェックしたコードだけが出題されます</div>
+  </div>
+
   <script>
-    const chords = ["C","G","Am","F","Dm","Em","E","A","D","Bm"];
+    // ここに「候補として表示したいコード」を並べておけばOK（チェックで絞り込み）
+    const ALL_CHORDS = ["C","Cm","D","Dm","E","Em","F","Fm","G","Gm","A","Am","B","Bm","C7","D7","E7","F7","G7","A7"];
+
     let index = 0;
     let timerId = null;
     let intervalSec = 3;
@@ -43,11 +65,56 @@
     const nextBtn = document.getElementById("next");
     const randomEl = document.getElementById("random");
 
-    function showChord() {
-      chordEl.textContent = chords[index];
+    const checksWrap = document.getElementById("checks");
+    const warnEl = document.getElementById("warn");
+    const selectAllBtn = document.getElementById("selectAll");
+    const clearAllBtn = document.getElementById("clearAll");
+
+    // --- 選択状態（localStorageに保存） ---
+    const STORAGE_KEY = "chord_trainer_selected";
+    function loadSelectedSet() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return new Set(ALL_CHORDS); // 初回は全選択
+        const arr = JSON.parse(raw);
+        if (!Array.isArray(arr) || arr.length === 0) return new Set(ALL_CHORDS);
+        return new Set(arr.filter(c => ALL_CHORDS.includes(c)));
+      } catch {
+        return new Set(ALL_CHORDS);
+      }
+    }
+    let selected = loadSelectedSet();
+
+    function saveSelectedSet() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...selected]));
+    }
+
+    function getActiveChords() {
+      return ALL_CHORDS.filter(c => selected.has(c));
+    }
+
+    function showWarn(show) {
+      warnEl.style.display = show ? "block" : "none";
+    }
+
+    function showChord(chords) {
+      if (chords.length === 0) {
+        chordEl.textContent = "—";
+        showWarn(true);
+        return;
+      }
+      showWarn(false);
+      chordEl.textContent = chords[index] ?? chords[0];
     }
 
     function nextChord() {
+      const chords = getActiveChords();
+      if (chords.length === 0) {
+        stop();
+        showChord(chords);
+        return;
+      }
+
       if (randomEl.checked) {
         let next;
         do { next = Math.floor(Math.random() * chords.length); }
@@ -56,10 +123,16 @@
       } else {
         index = (index + 1) % chords.length;
       }
-      showChord();
+
+      showChord(chords);
     }
 
     function start() {
+      const chords = getActiveChords();
+      if (chords.length === 0) {
+        showChord(chords);
+        return;
+      }
       if (timerId) return;
       timerId = setInterval(nextChord, intervalSec * 1000);
       startBtn.disabled = true;
@@ -78,17 +151,63 @@
     secEl.addEventListener("input", () => {
       intervalSec = Number(secEl.value);
       secLabel.textContent = intervalSec;
-      if (timerId) {
-        stop();
-        start();
-      }
+      if (timerId) { stop(); start(); }
     });
 
     startBtn.addEventListener("click", start);
     stopBtn.addEventListener("click", stop);
     nextBtn.addEventListener("click", nextChord);
 
-    showChord();
+    // --- チェックボックスUI生成 ---
+    function renderChecks() {
+      checksWrap.innerHTML = "";
+      for (const c of ALL_CHORDS) {
+        const id = `chk_${c.replace(/[^a-zA-Z0-9]/g, "_")}`;
+        const label = document.createElement("label");
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.id = id;
+        input.checked = selected.has(c);
+        input.addEventListener("change", () => {
+          if (input.checked) selected.add(c);
+          else selected.delete(c);
+          saveSelectedSet();
+
+          // 選択が変わったらインデックスを安全に戻す
+          index = 0;
+          showChord(getActiveChords());
+
+          // 動作中で、選択が0になったら停止
+          if (timerId && getActiveChords().length === 0) stop();
+        });
+
+        const span = document.createElement("span");
+        span.textContent = c;
+
+        label.appendChild(input);
+        label.appendChild(span);
+        checksWrap.appendChild(label);
+      }
+      showChord(getActiveChords());
+    }
+
+    selectAllBtn.addEventListener("click", () => {
+      selected = new Set(ALL_CHORDS);
+      saveSelectedSet();
+      index = 0;
+      renderChecks();
+    });
+
+    clearAllBtn.addEventListener("click", () => {
+      selected = new Set();
+      saveSelectedSet();
+      index = 0;
+      renderChecks();
+      stop();
+    });
+
+    // 初期表示
+    renderChecks();
   </script>
 </body>
 </html>
