@@ -462,7 +462,6 @@ function drawFretboard(frets, titleText) {
   let svg = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="fretboard">`;
 
   svg += `<text x="10" y="20" font-size="16" font-weight="800" fill="${textColor}">${titleText}</text>`;
-  svg += `<text x="10" y="${padT+14}" font-size="12" fill="${textColor}">${base===1 ? "open" : (base + "fr〜")}</text>`;
 
   // 弦
   for (let s=0;s<6;s++){
