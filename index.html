@@ -156,6 +156,41 @@ body.theme-low button {
 body.theme-low .sub {
   color: #d7d7d7;
 }
+  
+/* ===== Start / Stop 状態表示 ===== */
+button.is-active {
+  background-color: #2e7d32;
+  color: #ffffff;
+  border: 2px solid #1b5e20;
+}
+
+button.is-stop {
+  background-color: #b00020;
+  color: #ffffff;
+  border: 2px solid #7f0015;
+}
+
+body.theme-dark button.is-active {
+  background-color: #4caf50;
+  border-color: #2e7d32;
+}
+
+body.theme-dark button.is-stop {
+  background-color: #e53935;
+  border-color: #ab000d;
+}
+
+body.theme-low button.is-active {
+  background-color: #5fa96a;
+  border-color: #3f7f4a;
+}
+
+body.theme-low button.is-stop {
+  background-color: #d06a6a;
+  border-color: #9a3f3f;
+}
+
+  
 </style>
 </head>
 
@@ -541,17 +576,29 @@ secEl.addEventListener("input", (e)=>{
 /* ===== Start/Stop/Next（Stopが必ず効く版） ===== */
 startBtn.addEventListener("click", ()=>{
   if (timerId) return;
-  timerId = setInterval(stepNext, intervalSec*1000);
+
+  timerId = setInterval(stepNext, intervalSec * 1000);
+
   startBtn.disabled = true;
   stopBtn.disabled = false;
+
+  // ★ 見た目を「再生中」に
+  startBtn.classList.add("is-active");
+  stopBtn.classList.remove("is-stop");
 });
 
 stopBtn.addEventListener("click", ()=>{
   if (!timerId) return;
+
   clearInterval(timerId);
   timerId = null;
+
   startBtn.disabled = false;
   stopBtn.disabled = true;
+
+  // ★ 見た目を「停止中」に
+  startBtn.classList.remove("is-active");
+  stopBtn.classList.add("is-stop");
 });
 
 nextBtn.addEventListener("click", ()=>{
@@ -637,6 +684,8 @@ document.getElementById("qualNone").addEventListener("click", ()=>{
 renderRootChecks();
 renderQualChecks();
 renderCurrent();
+startBtn.classList.remove("is-active");
+stopBtn.classList.add("is-stop");
 </script>
 
 </body>
