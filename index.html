@@ -7,7 +7,8 @@
   <style>
     body { font-family: system-ui, sans-serif; padding: 24px; }
     h1 { margin: 0 0 14px; }
-    .chord { font-size: 72px; font-weight: 800; margin: 16px 0 10px; }
+    .chord { font-size: 72px; font-weight: 800; margin: 16px 0 6px; }
+
     .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
     button { padding: 10px 14px; font-size: 16px; cursor: pointer; }
     input[type="range"] { width: 220px; }
@@ -22,6 +23,11 @@
     .groupHeader { display: flex; align-items: center; gap: 10px; margin: 14px 0 6px; }
     .groupHeader h3 { margin: 0; min-width: 24px; }
     .smallBtn { padding: 6px 10px; font-size: 14px; }
+
+    .diagramWrap { margin: 4px 0 8px; display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+    .diagramCard { border: 1px solid #ddd; border-radius: 12px; padding: 10px 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .sub { color: #555; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -33,6 +39,15 @@
   </div>
 
   <div class="chord" id="chord">C</div>
+
+  <div class="diagramWrap">
+    <div class="diagramCard" id="diagram"></div>
+    <div>
+      <div class="sub">押さえ方（E A D G B E）</div>
+      <div class="mono" id="shapeText">x 3 2 0 1 0</div>
+      <div class="sub" style="margin-top:6px;">※指番号：1=人差し指 / 2=中指 / 3=薬指 / 4=小指</div>
+    </div>
+  </div>
 
   <div class="row">
     <button id="start">Start</button>
@@ -55,227 +70,31 @@
   </div>
 
   <script>
-    // ===== ルート別コード定義（ここを好みに増やしてOK） =====
-    const CHORD_GROUPS = {
-      "C": ["C", "Cm", "C7"],
-      "D": ["D", "Dm", "D7"],
-      "E": ["E", "Em", "E7"],
-      "F": ["F", "Fm", "F7"],
-      "G": ["G", "Gm", "G7"],
-      "A": ["A", "Am", "A7"],
-      "B": ["B", "Bm"]
-    };
+    // ===== コード定義（ギター標準チューニング：E A D G B E）=====
+    // frets: 6弦→1弦（E A D G B E）
+    // -1 = ミュート(x), 0 = 開放(0), 1以上 = フレット
+    // fingers: 6弦→1弦（0=指定なし）
+    // barre: { fret, fromString, toString, finger }  // from/to は 6〜1弦番号
+    const CHORD_SHAPES = {
+      "C":  { frets:[-1,3,2,0,1,0], fingers:[0,3,2,0,1,0] },
+      "Cm": { frets:[-1,3,5,5,4,3], fingers:[0,1,3,4,2,1], barre:{fret:3, fromString:5, toString:1, finger:1} },
+      "C7": { frets:[-1,3,2,3,1,0], fingers:[0,3,2,4,1,0] },
 
-    const ALL_CHORDS = Object.values(CHORD_GROUPS).flat();
+      "D":  { frets:[-1,-1,0,2,3,2], fingers:[0,0,0,1,3,2] },
+      "Dm": { frets:[-1,-1,0,2,3,1], fingers:[0,0,0,2,3,1] },
+      "D7": { frets:[-1,-1,0,2,1,2], fingers:[0,0,0,2,1,3] },
 
-    // ===== 状態 =====
-    let index = 0;
-    let timerId = null;
-    let intervalSec = 3;
+      "E":  { frets:[0,2,2,1,0,0], fingers:[0,2,3,1,0,0] },
+      "Em": { frets:[0,2,2,0,0,0], fingers:[0,2,3,0,0,0] },
+      "E7": { frets:[0,2,0,1,0,0], fingers:[0,2,0,1,0,0] },
 
-    // ===== DOM =====
-    const chordEl = document.getElementById("chord");
-    const secEl = document.getElementById("sec");
-    const secLabel = document.getElementById("secLabel");
-    const startBtn = document.getElementById("start");
-    const stopBtn = document.getElementById("stop");
-    const nextBtn = document.getElementById("next");
-    const randomEl = document.getElementById("random");
+      "F":  { frets:[1,3,3,2,1,1], fingers:[1,3,4,2,1,1], barre:{fret:1, fromString:6, toString:1, finger:1} },
+      "Fm": { frets:[1,3,3,1,1,1], fingers:[1,3,4,1,1,1], barre:{fret:1, fromString:6, toString:1, finger:1} },
+      "F7": { frets:[1,3,1,2,1,1], fingers:[1,3,1,2,1,1], barre:{fret:1, fromString:6, toString:1, finger:1} },
 
-    const checksWrap = document.getElementById("checks");
-    const warnEl = document.getElementById("warn");
-    const selectAllBtn = document.getElementById("selectAll");
-    const clearAllBtn = document.getElementById("clearAll");
+      "G":  { frets:[3,2,0,0,0,3], fingers:[3,2,0,0,0,4] },
+      "Gm": { frets:[3,5,5,3,3,3], fingers:[1,3,4,1,1,1], barre:{fret:3, fromString:6, toString:1, finger:1} },
+      "G7": { frets:[3,2,0,0,0,1], fingers:[3,2,0,0,0,1] },
 
-    // ===== 選択状態（localStorage） =====
-    const STORAGE_KEY = "chord_trainer_selected";
-
-    function loadSelectedSet() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return new Set(ALL_CHORDS); // 初回は全選択
-        const arr = JSON.parse(raw);
-        if (!Array.isArray(arr) || arr.length === 0) return new Set(ALL_CHORDS);
-        return new Set(arr.filter(c => ALL_CHORDS.includes(c)));
-      } catch {
-        return new Set(ALL_CHORDS);
-      }
-    }
-
-    let selected = loadSelectedSet();
-
-    function saveSelectedSet() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([...selected]));
-    }
-
-    function getActiveChords() {
-      return ALL_CHORDS.filter(c => selected.has(c));
-    }
-
-    function showWarn(show) {
-      warnEl.style.display = show ? "block" : "none";
-    }
-
-    function showChord() {
-      const chords = getActiveChords();
-      if (chords.length === 0) {
-        chordEl.textContent = "—";
-        showWarn(true);
-        return;
-      }
-      showWarn(false);
-      chordEl.textContent = chords[index] ?? chords[0];
-    }
-
-    function nextChord() {
-      const chords = getActiveChords();
-      if (chords.length === 0) {
-        stop();
-        showChord();
-        return;
-      }
-
-      if (randomEl.checked) {
-        let next;
-        do { next = Math.floor(Math.random() * chords.length); }
-        while (next === index && chords.length > 1);
-        index = next;
-      } else {
-        index = (index + 1) % chords.length;
-      }
-
-      showChord();
-    }
-
-    function start() {
-      const chords = getActiveChords();
-      if (chords.length === 0) {
-        showChord();
-        return;
-      }
-      if (timerId) return;
-      timerId = setInterval(nextChord, intervalSec * 1000);
-      startBtn.disabled = true;
-      stopBtn.disabled = false;
-    }
-
-    function stop() {
-      if (!timerId) return;
-      clearInterval(timerId);
-      timerId = null;
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-    }
-
-    // 表示秒数変更（動作中なら張り替え）
-    secEl.addEventListener("input", () => {
-      intervalSec = Number(secEl.value);
-      secLabel.textContent = intervalSec;
-      if (timerId) { stop(); start(); }
-    });
-
-    startBtn.addEventListener("click", start);
-    stopBtn.addEventListener("click", stop);
-    nextBtn.addEventListener("click", nextChord);
-
-    // ===== チェックボックス描画（ルート別 + 一括ON/OFF） =====
-    function applySelectionChange() {
-      saveSelectedSet();
-      index = 0;
-      showChord();
-      if (timerId && getActiveChords().length === 0) stop();
-    }
-
-    function renderChecks() {
-      checksWrap.innerHTML = "";
-
-      for (const root in CHORD_GROUPS) {
-        const chordsInGroup = CHORD_GROUPS[root];
-
-        // 見出し + 一括ON/OFF
-        const header = document.createElement("div");
-        header.className = "groupHeader";
-
-        const title = document.createElement("h3");
-        title.textContent = root;
-
-        const onBtn = document.createElement("button");
-        onBtn.type = "button";
-        onBtn.className = "smallBtn";
-        onBtn.textContent = `${root} 全ON`;
-
-        const offBtn = document.createElement("button");
-        offBtn.type = "button";
-        offBtn.className = "smallBtn";
-        offBtn.textContent = `${root} 全OFF`;
-
-        header.appendChild(title);
-        header.appendChild(onBtn);
-        header.appendChild(offBtn);
-        checksWrap.appendChild(header);
-
-        // グループ内チェック
-        const groupDiv = document.createElement("div");
-        groupDiv.className = "checks";
-
-        const inputs = [];
-
-        onBtn.addEventListener("click", () => {
-          for (const c of chordsInGroup) selected.add(c);
-          for (const inp of inputs) inp.checked = true;
-          applySelectionChange();
-        });
-
-        offBtn.addEventListener("click", () => {
-          for (const c of chordsInGroup) selected.delete(c);
-          for (const inp of inputs) inp.checked = false;
-          applySelectionChange();
-        });
-
-        for (const c of chordsInGroup) {
-          const label = document.createElement("label");
-          const input = document.createElement("input");
-          input.type = "checkbox";
-          input.checked = selected.has(c);
-
-          input.addEventListener("change", () => {
-            if (input.checked) selected.add(c);
-            else selected.delete(c);
-            applySelectionChange();
-          });
-
-          inputs.push(input);
-
-          const span = document.createElement("span");
-          span.textContent = c;
-
-          label.appendChild(input);
-          label.appendChild(span);
-          groupDiv.appendChild(label);
-        }
-
-        checksWrap.appendChild(groupDiv);
-      }
-
-      showChord();
-    }
-
-    // 全選択 / 全解除
-    selectAllBtn.addEventListener("click", () => {
-      selected = new Set(ALL_CHORDS);
-      applySelectionChange();
-      renderChecks();
-    });
-
-    clearAllBtn.addEventListener("click", () => {
-      selected = new Set();
-      applySelectionChange();
-      renderChecks();
-      stop();
-    });
-
-    // 初期表示
-    renderChecks();
-  </script>
-</body>
-</html>
+      "A":  { frets:[-1,0,2,2,2,0], fingers:[0,0,1,2,3,0] },
+      "Am": { frets:[-1,0,2,2,1,
