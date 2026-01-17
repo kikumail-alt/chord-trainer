@@ -212,7 +212,7 @@
       const fretGap = gridW / fretCount;
 
       const xForFretLine = (f) => padL + f * fretGap;         // f:0..6
-      const yForString = (sIndex0) => padT + sIndex0 * stringGap; // sIndex0:0..5 (6弦..1弦)
+      const yForString = (sIndex0) => padT + (5 - sIndex0) * stringGap; // 1弦が上（一般的）
 
       const dotR = 11;
 
