@@ -85,7 +85,7 @@ input[type="range"] {
   font-family: monospace;
 }
 
-/* ===== テーマ切替UI ===== */
+/* ===== テーマ切替 ===== */
 .theme-switch {
   position: fixed;
   top: 12px;
@@ -98,9 +98,6 @@ input[type="range"] {
 /* ===== 白黒反転 ===== */
 body.theme-dark {
   background-color: #111111;
-}
-
-body.theme-dark {
   color: #eeeeee;
 }
 
@@ -118,23 +115,21 @@ body.theme-dark svg {
   filter: invert(1) hue-rotate(180deg);
 }
 
-/* ===== 低コントラスト ===== */
+/* ===== 低コントラスト（改善版） ===== */
 body.theme-low {
-  background-color: #1e1e1e;
-}
-
-body.theme-low {
-  color: #cccccc;
+  background-color: #2a2a2a;
+  color: #dddddd;
 }
 
 body.theme-low .panel,
 body.theme-low .fbCard {
-  background-color: #262626;
+  background-color: #333333;
+  border-color: #555555;
 }
 
 body.theme-low button {
-  background-color: #2f2f2f;
-  color: #d0d0d0;
+  background-color: #3a3a3a;
+  color: #eeeeee;
 }
 </style>
 </head>
@@ -176,26 +171,31 @@ body.theme-low button {
 </div>
 
 <script>
-/* ===== コード定義 ===== */
+/* ===== コード定義（7th追加） ===== */
 const CHORDS = {
-  C:{f:[-1,3,2,0,1,0],g:"C"},
-  D:{f:[-1,-1,0,2,3,2],g:"D"},
-  E:{f:[0,2,2,1,0,0],g:"E"},
-  F:{f:[1,3,3,2,1,1],g:"F"},
-  G:{f:[3,2,0,0,0,3],g:"G"},
-  A:{f:[-1,0,2,2,2,0],g:"A"},
-  Am:{f:[-1,0,2,2,1,0],g:"A"},
-  Em:{f:[0,2,2,0,0,0],g:"E"},
-  Dm:{f:[-1,-1,0,2,3,1],g:"D"}
+  C:{f:[-1,3,2,0,1,0]},
+  C7:{f:[-1,3,2,3,1,0]},
+  D:{f:[-1,-1,0,2,3,2]},
+  D7:{f:[-1,-1,0,2,1,2]},
+  E:{f:[0,2,2,1,0,0]},
+  E7:{f:[0,2,0,1,0,0]},
+  F:{f:[1,3,3,2,1,1]},
+  F7:{f:[1,3,1,2,1,1]},
+  G:{f:[3,2,0,0,0,3]},
+  G7:{f:[3,2,0,0,0,1]},
+  A:{f:[-1,0,2,2,2,0]},
+  A7:{f:[-1,0,2,0,2,0]},
+  B7:{f:[-1,2,1,2,0,2]}
 };
 
 const GROUPS = {
-  C:["C"],
-  D:["D","Dm"],
-  E:["E","Em"],
-  F:["F"],
-  G:["G"],
-  A:["A","Am"]
+  C:["C","C7"],
+  D:["D","D7"],
+  E:["E","E7"],
+  F:["F","F7"],
+  G:["G","G7"],
+  A:["A","A7"],
+  B:["B7"]
 };
 
 const ALL = Object.keys(CHORDS);
@@ -212,25 +212,33 @@ const fretboardEl = document.getElementById("fretboard");
 const shapeTextEl = document.getElementById("shapeText");
 const warnEl = document.getElementById("warn");
 
-/* ===== 指板描画 ===== */
+/* ===== 指板描画（低コントラスト対応） ===== */
 function drawFretboard(name){
   const f = CHORDS[name].f;
+  const isLow = document.body.classList.contains("theme-low");
+  const lineColor = isLow ? "#bbbbbb" : "#000000";
+  const dotColor = isLow ? "#f0f0f0" : "#000000";
+
   let svg = `<svg viewBox="0 0 700 160" width="100%">`;
+
   for(let s=0;s<6;s++){
     let y=30+(5-s)*22;
-    svg+=`<line x1="80" y1="${y}" x2="660" y2="${y}" stroke="black"/>`;
+    svg+=`<line x1="80" y1="${y}" x2="660" y2="${y}" stroke="${lineColor}" stroke-width="2"/>`;
   }
+
   for(let i=0;i<6;i++){
     let x=80+i*96;
-    svg+=`<line x1="${x}" y1="30" x2="${x}" y2="140" stroke="black"/>`;
+    svg+=`<line x1="${x}" y1="30" x2="${x}" y2="140" stroke="${lineColor}" stroke-width="2"/>`;
   }
+
   for(let s=0;s<6;s++){
     if(f[s]>0){
       let cx=80+(f[s]-0.5)*96;
       let cy=30+(5-s)*22;
-      svg+=`<circle cx="${cx}" cy="${cy}" r="8" fill="black"/>`;
+      svg+=`<circle cx="${cx}" cy="${cy}" r="9" fill="${dotColor}"/>`;
     }
   }
+
   svg+=`</svg>`;
   fretboardEl.innerHTML = svg;
   shapeTextEl.textContent = "押さえ方: " + f.map(v=>v<0?"x":v).join(" ");
@@ -258,6 +266,7 @@ function renderChecks(){
     h.className="groupHeader";
     h.innerHTML=`<strong>${g}</strong>`;
     wrap.appendChild(h);
+
     const c=document.createElement("div");
     c.className="checks";
     GROUPS[g].forEach(k=>{
@@ -265,7 +274,10 @@ function renderChecks(){
       const i=document.createElement("input");
       i.type="checkbox";
       i.checked=selected.has(k);
-      i.onchange=()=>{i.checked?selected.add(k):selected.delete(k);show();};
+      i.onchange=()=>{
+        i.checked ? selected.add(k) : selected.delete(k);
+        show();
+      };
       l.appendChild(i);
       l.append(k);
       c.appendChild(l);
@@ -299,8 +311,11 @@ function applyTheme(t){
   document.body.classList.remove("theme-dark","theme-low");
   if(t==="dark")document.body.classList.add("theme-dark");
   if(t==="low")document.body.classList.add("theme-low");
+  show();
 }
+
 applyTheme(localStorage.getItem(THEME_KEY)||"normal");
+
 document.querySelectorAll(".theme-switch button").forEach(b=>{
   b.onclick=()=>{
     const t=b.dataset.theme;
@@ -309,5 +324,6 @@ document.querySelectorAll(".theme-switch button").forEach(b=>{
   };
 });
 </script>
+
 </body>
 </html>
